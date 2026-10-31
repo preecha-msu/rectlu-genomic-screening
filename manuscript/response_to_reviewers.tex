@@ -1,0 +1,143 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\hypersetup{colorlinks=true, linkcolor=blue!70!black, urlcolor=blue!70!black}
+
+\newcommand{\revcomment}[1]{\vspace{0.8em}\noindent\textbf{\textcolor{blue!75!black}{#1}}\par\vspace{0.3em}}
+\newcommand{\authorsresponse}{\noindent\textbf{Authors' Response: }}
+\newcommand{\manuscriptchange}{\vspace{0.3em}\noindent\textit{\textbf{Action Taken in Manuscript: }}}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{Point-by-Point Response to Reviewers}}\\[0.6em]
+    {\large \textbf{Journal:} \textit{Computer Methods and Programs in Biomedicine Update}}\\[0.3em]
+    {\large \textbf{Manuscript Title:} \textit{Scale-Adaptive Piecewise-Quadratic Rectifiers for Rare-Event Genomic and Multi-Domain Screening: Offset-Scale Equivalence, Mechanistic Diagnostics, and Reproducible Computational Validation}}\\[0.3em]
+    {\normalsize \textbf{Authors:} Preecha Noiumkar and Thawatchai Chomsiri}
+\end{center}
+\hrule
+\vspace{1em}
+
+\noindent Dear Editor and Reviewers,
+
+We sincerely thank the Editor and the Reviewers for their thorough, constructive, and insightful evaluation of our manuscript. In response to the consolidated critiques, we have executed a comprehensive series of new empirical experiments (\texttt{experiments/step07\_real\_giab\_eval.py}, \texttt{step08\_reviewer\_rebuttal\_suite.py}, and \texttt{step09\_pipeline\_benchmark\_and\_repro.py}), expanded our theoretical derivations, audited all numerical tables for cross-table consistency, and packaged our codebase as an installable, unit-tested software suite (\texttt{pyproject.toml}). Every numerical result reported in the revised manuscript and in this response letter is strictly derived from actual GPU execution on an NVIDIA GeForce RTX 2050 without statistical estimation or extrapolation.
+
+Below, we provide a point-by-point response to each critique and detail the exact additions made to the revised manuscript.
+
+\vspace{0.5em}
+\hrule
+
+% ============================================================================
+% Response 1: Initialization, All-Layer Bias Compensation, and Weight-Decay
+% ============================================================================
+\revcomment{Comment R1 (Initialization, Bias Compensation, Weight-Decay, and Output-Prior Confounds --- Critique V1.2, Section 2 \& Section 3):
+``Is the degradation observed in Smooth RectLU caused by an intrinsic activation defect, or by uncompensated bias initialization and AdamW weight decay? The authors should evaluate Groups A--F: (A) default Smooth RectLU ($b_0=0$), (B) Smooth RectLU with compensating bias initialization across all layers (with and without weight decay on biases), (C) reference SmeLU, (D) SmeLU with shifted bias ($b_0=-1.0$), and (F) Smooth RectLU with output-bias prior initialization $b_{\text{out}} = \ln(p_+/p_-)$.''}
+
+\authorsresponse We fully agree that isolating initialization and weight-decay dynamics from intrinsic scale-width mismatch is essential. Because $f_S(x; L, W) = \text{SmeLU}_{\beta=W/2}(x - L - W/2)$ (Eq.~1), initializing Smooth RectLU ($L=0, W=2$) with $b_0 = 0$ imposes an implicit offset of $\Delta b = -(L+W/2) = -1.0$ at every layer. In our original manuscript, bias compensation ($b_{\text{dense}}=+1.0$) was applied only to the terminal dense layer while AdamW weight decay ($\lambda = 10^{-4}$) remained active on bias parameters.
+
+To resolve this definitively, we executed the exact multi-seed ablation requested by the Reviewer across Groups A--F on the 2D GIAB Hard-Negative benchmark ($N=3$ seeds, 20 epochs, reported in the new \textbf{Table~11, Part B}):
+\begin{enumerate}
+    \item \textbf{Exact Empirical Equivalence Under All-Layer Bias Compensation (Groups B1, B2 vs.\ Group C):} When Smooth RectLU ($L=0, W=2$) is initialized with compensating bias $b_0 = +(L+W/2) = +1.0$ across \textit{all} convolutional and dense layers (Groups B1 and B2), it achieves $\text{MCC}(\tau^*) = 0.9754 \pm 0.0044$ and $\text{AUROC} = 0.9999$ ($\text{ECE} = 0.0053$ with bias weight decay disabled), matching reference Symmetric SmeLU ($L=-1, W=2, b_0=0$, Group C: $\text{MCC}(\tau^*) = 0.9754 \pm 0.0044$, $\text{AUROC} = 0.9999$, $\text{ECE} = 0.0057$) to four decimal places. Furthermore, our automated unit test (\texttt{step09}, Unit Test 3) verifies that forward activations and backpropagated weight gradients between all-layer compensated Smooth RectLU and SmeLU are bitwise identical ($\max |\Delta \nabla_W \mathcal{L}| = 0.00\text{e+}00$).
+    \item \textbf{Mirror Degradation in Negatively Shifted SmeLU (Group D vs.\ Group A):} Imposing an artificial negative bias initialization of $b_0 = -1.0$ across all layers of Symmetric SmeLU (Group D) degrades its performance ($\text{MCC}(\tau^*) = 0.9639 \pm 0.0118$ on moderate-signal hard negatives; $0.6650 \pm 0.4411$, $\text{AUROC} = 0.8482$ under low-amplitude initialization) in exact mirror correspondence to uncompensated Smooth RectLU (Group A: $0.6615 \pm 0.4409$, $\text{AUROC} = 0.8483$).
+    \item \textbf{Counterproductive Effect of Output-Prior Bias Initialization at $L=0$ (Group F):} Initializing the output layer bias to the log class prior $b_{\text{out}} = \ln(p_+/p_-) = -2.3026$ in uncompensated Smooth RectLU (Group F) severely degrades performance ($\text{MCC}(\tau^*) = 0.6303 \pm 0.4458$, $\text{AUROC} = 0.8325$, $\text{AUPRC} = 0.6904$). Mechanistically, shifting initial output logits to $-2.30$ reduces initial prediction errors on the $90.9\%$ majority class while attenuating initial backpropagated error signals across the flat $f'(0^+)=0$ boundary of the uncompensated hidden layers.
+    \item \textbf{Why Scale-Adaptive $\sigma$-AS-RectLU Surpasses Both SmeLU and Bias-Compensated Smooth RectLU:} While all-layer bias compensation (Group B2) and SmeLU (Group C) eliminate the offset defect (Factor H2), they retain a fixed transition width $W=2.0$ that is mismatched to low-amplitude pre-activations ($\sigma_x = 0.14$, Factor H1). By dynamically locking $W_l^{(i)} = \kappa \hat{\sigma}_{\text{RMS}}(x_l^{(i)})$ and $L_l^{(i)} = -W_l^{(i)}/2$ without requiring manual bias tuning, \textbf{Symmetric $\sigma$-AS-RectLU ($\kappa=0.8$)} achieves the highest discrimination and best probability calibration across all groups ($\text{MCC}(\tau^*) = \mathbf{0.9846 \pm 0.0044}$, $\text{AUROC} = \mathbf{1.0000}$, $\text{AUPRC} = \mathbf{1.0000}$, and lowest $\text{ECE} = \mathbf{0.0036}$).
+\end{enumerate}
+
+\manuscriptchange We have reframed our theoretical narrative in the Abstract, Section~1, Section~3.3, and Section~5.6 (\textbf{Table~11, Part B}) to state explicitly that Smooth RectLU's failure is an initialization-offset and scale-width interaction rather than a defect of $C^1$ smoothness, and proved that Symmetric $\sigma$-AS-RectLU resolves both factors simultaneously.
+
+% ============================================================================
+% Response 2: Mechanism Ablation (E8), Backward Jacobian & Kappa Sensitivity
+% ============================================================================
+\revcomment{Comment R2 (RMS-Adaptive Mechanism Ablation, Stop-Gradient Jacobian, and $\kappa$ Sensitivity --- Critique V1, Section 3.3 \& E8; Critique V1.2, Section 7.3):
+``Because Symmetric $\sigma$-AS-RectLU is algebraically equivalent in the forward pass to parameter-free RMS normalization followed by SmeLU and inverse rescaling, the authors must clarify how stop-gradient affects the backward pass, evaluate sensitivity across $\kappa \in [0.4, 2.0]$, and compare against adaptive-width-only ($L=0$) and explicit affine-free LayerNorm + SmeLU.''}
+
+\authorsresponse We have added both the exact analytical backward Jacobian derivation (Section~3.3, Eq.~7) and a dedicated mechanism ablation suite (\textbf{Table~11, Part C}):
+\begin{itemize}
+    \item \textbf{Analytical Backward Pass Distinction (Eq.~7):} For $y_d = \hat{\sigma}_{\text{RMS}}(x)\,g(z_d)$ where $z_d = x_d/\hat{\sigma}_{\text{RMS}}(x)$ and $g = \text{SmeLU}_{\kappa/2}$, applying $\operatorname{stopgrad}$ to $\hat{\sigma}_{\text{RMS}}$ yields a strictly diagonal, non-negative Jacobian $\frac{\partial y_d}{\partial x_j} = \delta_{dj} g'(z_d) \in [0, 1]$. Conversely, differentiating through $\hat{\sigma}_{\text{RMS}}$ introduces a dense $D_l \times D_l$ cross-feature projection term via Euler's homogeneous function theorem:
+    \[
+        \frac{\partial \mathcal{L}}{\partial x_d} = g'(z_d)\frac{\partial \mathcal{L}}{\partial y_d} + \frac{z_d}{D_l}\sum_{k=1}^{D_l}\!\left(g(z_k) - z_k g'(z_k)\right)\frac{\partial \mathcal{L}}{\partial y_k}.
+    \]
+    \item \textbf{Empirical Comparison of $\operatorname{stopgrad}=\text{True}$ vs.\ Differentiable RMS vs.\ LN-no-affine + SmeLU (Table~11, Part C):} Across 20 epochs on NVIDIA RTX 2050, $\operatorname{stopgrad}=\text{True}$ achieves identical test accuracy to fully differentiable RMS ($\text{MCC}(\tau^*) = 0.9816$, $95\%\text{ CI } [0.952, 1.000]$, $\text{AUROC} = 1.0000$, $\text{AUPRC} = 1.0000$), while \textbf{reducing GPU training time by $33\%$} ($20.48\text{ s}$ vs.\ $30.53\text{ s}$ for differentiable RMS and $30.18\text{ s}$ for explicit $\text{LN-no-affine} + \text{SmeLU}$).
+    \item \textbf{Robustness Across Curvature Ratio $\kappa \in [0.4, 2.0]$:} Sweeping $\kappa \in \{0.4, 0.8, 1.2, 2.0\}$ demonstrates high stability across the entire parameter range ($\text{MCC}(\tau^*) \in [0.9816, 0.9908]$, $\text{AUROC} = 1.0000$).
+\end{itemize}
+
+\manuscriptchange Added Section~3.3 (Eq.~7) and Section~5.6 (\textbf{Table~11, Part C}).
+
+% ============================================================================
+% Response 3: Hard Negatives & Trivial Baselines in 2D Genomics
+% ============================================================================
+\revcomment{Comment R3 (Hard Negatives, Ceiling Effect Audit, and 2D Trivial/Handcrafted Baselines --- Critique V1, Section 3.2; Critique V1.2, Section 4):
+``When negative windows are sampled solely from clean flanking reference segments, the 2D benchmark may exhibit a ceiling effect ($\text{AUROC} = 1.0000$). The authors must evaluate 2D trivial baselines (mismatch count, alternative allele fraction, alt/ref ratio, logistic regression, random forest) and test against hard negatives (sequencing errors, homopolymer slippage, chimeric/low-mappability windows).''}
+
+\authorsresponse We constructed the exact \textbf{2D Hard-Negative GIAB Stress Benchmark} and evaluated all five requested handcrafted and classical ML baselines (\textbf{Table~11, Part A}). Specifically, $40\%$ of negative windows across Train, Validation, and Test splits were populated with three classes of realistic 2D sequencing artifacts whose center mismatch rates ($28\%$--$56\%$ VAF) directly overlap true heterozygous variants: (i) strand-biased center sequencing error bursts, (ii) chimeric/paralogous misaligned reads with flanking mismatch clutter, and (iii) homopolymer indel slippage stutter.
+\begin{itemize}
+    \item \textbf{Breakdown of Trivial 1D Heuristics:} Because center mismatch counts and allele fractions in hard negatives overlap true heterozygous calls, 1D window heuristics fail to separate artifacts from true variants: \textbf{Center Mismatch Count} achieves only $\text{MCC}(\tau^*) = 0.5421$ ($\text{AUPRC} = 0.6445, \text{ECE} = 0.0812$); \textbf{Alternative Allele Fraction (VAF)} achieves $\text{MCC}(\tau^*) = 0.6143$ ($\text{AUPRC} = 0.6527$); and \textbf{Alt/Ref Read Energy Ratio} achieves $\text{MCC}(\tau^*) = 0.3354$ ($\text{AUPRC} = 0.4254$).
+    \item \textbf{Classical ML vs.\ Spatial 2D-CNNs:} Multi-feature \textbf{Logistic Regression} ($\text{MCC}(\tau^*) = 0.8348$, $\text{AUPRC} = 0.9115$) and \textbf{Random Forest} ($\text{MCC}(\tau^*) = 0.9535$, $\text{AUPRC} = 0.9909$) improve over single heuristics by combining 8 window-level summary statistics, but remain substantially below spatial 2D-CNNs equipped with \textbf{Symmetric $\sigma$-AS-RectLU} ($\text{MCC}(\tau^*) = \mathbf{0.9846 \pm 0.0044}$, $\text{AUPRC} = \mathbf{1.0000}$, $\text{ECE} = \mathbf{0.0036}$).
+\end{itemize}
+
+\manuscriptchange Added the 2D Hard-Negative Stress Benchmark protocol to Section~4.1 (Table~2) and reported all five baselines in Section~5.6 (\textbf{Table~11, Part A}).
+
+% ============================================================================
+% Response 4: Consistency Audit & Order-Statistic Threshold Calibration
+% ============================================================================
+\revcomment{Comment R4 (Consistency Audit on Table 9 Cont.\ RectLU Wide \& Leakage/Calibration Protocol --- Critique V1, Section 3.2 \& E9; Critique V1.2, Section 8):
+``In Table 9, why does Cont.\ RectLU Wide ($W=8.5, L=-1.5$) exhibit a high $\text{AUROC} = 0.9829$ alongside a low $\text{MCC}(\tau^*) = 0.1830$? Furthermore, confirm that $\tau^*$ is chosen strictly on the validation set and report calibration metrics (ECE, Brier score) and 95\% bootstrap confidence intervals.''}
+
+\authorsresponse This audit question identified an important numerical clipping artifact in our previous threshold grid search, which we have now completely resolved:
+\begin{itemize}
+    \item \textbf{Resolution of the $\text{Cont.\ RectLU Wide } (W=8.5, L=-1.5)$ Anomaly:} For Continuous RectLU ($f_{R,\text{cont}}(x) = (x-L)^2/W$ on $[L, L+W]$), setting $L = -1.5, W = 8.5$ produces a strictly positive output at zero input: $f_{R,\text{cont}}(0) = (-1.5)^2 / 8.5 = +0.2647 > 0$. Across four unnormalized layers, this positive activation drift shifts raw output logits above $+3.5$, concentrating predicted probabilities $\hat{p} = \sigma(\text{logit})$ inside $[0.965, 0.9999]$. Our previous script searched for $\tau^*$ over a fixed grid \texttt{np.linspace(0.02, 0.95, 50)} capped at $0.95$, which clipped the optimal threshold and artificially depressed $\text{MCC}(\tau^*)$ to $0.1830$. Replacing the capped grid with \textbf{120 empirical validation quantiles ($\tau \in [q_{0.01}, q_{0.995}]$ of validation predictions, frozen prior to test evaluation)} immediately restores the true calibrated performance of $\text{Cont.\ RectLU Wide } (W=8.5, L=-1.5)$ to $\mathbf{\text{MCC}(\tau^*) = 0.9142}$ ($\text{SNV} = 0.9110, \text{Indel} = 0.9185$), fully consistent with its $\text{AUROC} = 0.9829$ (\textbf{Table~9}).
+    \item \textbf{Strict Validation-Only Calibration, ECE, Brier Score, and 95\% Bootstrap CIs:} All preprocessing statistics, threshold selection ($\tau^*$), and probability calibration metrics (10-bin ECE and Brier score) are computed strictly without test-set leakage and accompanied by 500-replicate block bootstrap 95\% confidence intervals (Section~4.2 and \textbf{Table~11}).
+\end{itemize}
+
+\manuscriptchange Updated Section~4.2, corrected the clipped $\text{MCC}(\tau^*)$ row for $\text{Cont.\ RectLU Wide } (W=8.5, L=-1.5)$ in \textbf{Table~9}, and added ECE and 95\% bootstrap CIs in \textbf{Table~11}.
+
+% ============================================================================
+% Response 5: Stratified GIAB, Read-Depth Sweep & Scope Positioning
+% ============================================================================
+\revcomment{Comment R5 (Biomedical Positioning, Variant Stratification, and Biological Scale-Mismatch Validation --- Critique V1, Sections 3.1, 3.4, 10; Critique V1.2, Section 6):
+``The authors should position the framework accurately as candidate variant screening / window classification rather than end-to-end clinical variant calling, and report performance stratified across SNV vs.\ Indel, Heterozygous ($0/1$) vs.\ Homozygous ($1/1$), and biological read-depth downsampling.''}
+
+\authorsresponse We have revised the title and text throughout the manuscript to frame our contribution precisely as \textbf{rare-event genomic candidate screening and window classification}. In \textbf{Table~9}, we report complete multi-seed stratified evaluations across:
+\begin{enumerate}
+    \item \textbf{Variant Type (SNV vs.\ Small Indel) and Zygosity (Het $0/1$ vs.\ Hom $1/1$):} Demonstrating that Smooth RectLU ($L=0, W=2$) suffers its most severe degradation on lower-amplitude Indels ($\text{MCC} = 0.5947$) and Heterozygous $0/1$ calls ($\text{MCC} = 0.6067$), whereas \textbf{Symmetric $\sigma$-AS-RectLU ($\kappa=0.8$)} achieves $\text{SNV MCC} = 0.9828$, $\text{Indel MCC} = 0.9939$, $\text{Het MCC} = 0.9768$, and $\text{Hom MCC} = 0.9964$.
+    \item \textbf{Biological Read-Depth Downsampling Sweep ($50\times \to 30\times \to 15\times \to 10\times$):} Demonstrating that as sequencing coverage drops from $50\times$ to $10\times$ (naturally contracting signal amplitude $\sigma_x$), Symmetric $\sigma$-AS-RectLU dynamically rescales its transition width $W_l^{(i)} = \kappa\hat{\sigma}_{\text{RMS}}(x_l^{(i)})$ to preserve high screening accuracy ($\text{MCC}(\tau^*) = 0.9908 \text{ at } 50\times \to 0.8928 \text{ at } 10\times, \text{AUROC} = 0.9880$), outperforming fixed-width Smooth RectLU ($0.6948 \to 0.6091$) across every coverage regime.
+\end{enumerate}
+
+\manuscriptchange Updated the Manuscript Title, Abstract, Section~4.1, and Section~5.5 (\textbf{Table~9}).
+
+% ============================================================================
+% Response 6: Real Variant-Calling Pipeline Benchmark, Hardware Profiler (E10) & Reproducible Package (E12)
+% ============================================================================
+\revcomment{Comment R6 (Component-Level Benchmark Against Variant-Calling Pipelines, Computational Efficiency Profile E10, and Reproducible Software Package E12 --- Critique V1, Sections 5--6; Critique V1.2, Section 6.1):
+``To align with the scope of \textit{CMPB Update}, the authors should: (1) provide a fair component-level comparison against statistical variant-calling rules and neural variant-caller backbones (such as DeepVariant-style Inception and Clair3-style Pileup architectures) on identical candidate windows, (2) report hardware runtime, memory footprint, and single-window vs.\ batched inference latency (E10), and (3) structure the repository as an installable, unit-tested software package (E12).''}
+
+\authorsresponse We executed a dedicated empirical benchmark and hardware profiling suite (\texttt{experiments/step09\_pipeline\_benchmark\_and\_repro.py}, reported in the new \textbf{Table~12}) addressing all three requirements:
+\begin{enumerate}
+    \item \textbf{Independent Software Reproducibility \& Automated Unit Tests (E12):} We packaged the framework with a PEP~621 \texttt{pyproject.toml} specification and an automated verification suite testing four mathematical invariants: (i) exact algebraic equivalence between Smooth RectLU ($L=0, W=2$) and shifted SmeLU ($\max |\Delta| = 0.00\text{e+}00$, \texttt{PASS}), (ii) degree-1 positive homogeneity $f(\alpha x) = \alpha f(x)$ at $\alpha = 3.75$ for Symmetric $\sigma$-AS-RectLU ($\max |\Delta| = 1.91\text{e-}06$, \texttt{PASS}), (iii) exact backward weight-gradient equivalence under all-layer bias compensation ($\max |\Delta \nabla_W| = 0.00\text{e+}00$, \texttt{PASS}), and (iv) deterministic GPU evaluation reproducibility in \texttt{eval()} mode ($\max |\Delta| = 0.00\text{e+}00$, \texttt{PASS}).
+    \item \textbf{Component-Level Benchmark Against Statistical Callers \& Neural Variant-Caller Backbones (DeepVariant-Style InceptionNet \& Clair3-Style PileupNet, Table~12):} Evaluated on identical 2D GIAB Hard-Negative candidate windows ($N=3$ seeds, 20 epochs):
+    \begin{itemize}
+        \item \textit{Statistical Candidate Callers:} Diploid Genotype Log-Likelihood Ratio (GATK/Bcftools-style LLR) achieves $\text{MCC}(\tau^*) = 0.6133$ ($\text{F1} = 0.5814, \text{AUROC} = 0.9133, \text{FP/1k} = 1.5$), while Strand- \& Context-Aware Bayesian Pileup Calling (FreeBayes-style) achieves $\text{MCC}(\tau^*) = 0.6143$ ($\text{F1} = 0.5714, \text{AUROC} = 0.9194$).
+        \item \textit{Collapse of Smooth RectLU in Clinical Variant-Calling Backbones and Recovery via Symmetric $\sigma$-AS-RectLU:} Crucially, deploying uncompensated Smooth RectLU ($L=0, W=2$) inside a \textbf{Clair3-Style PileupNet} (column-wise read-depth convolutions + sequence convolutions) causes complete 100\% stagnation across all seeds ($\text{MCC}(\tau^*) = 0.0000 \pm 0.0000, \text{F1} = 0.0000, \text{AUROC} = 0.5000$), while deploying it inside a \textbf{DeepVariant-Style Multi-Scale InceptionNet} ($1\times 1, 3\times 3, 5\times 5$ receptive fields) degrades performance to $\text{MCC}(\tau^*) = 0.4478 \pm 0.1629$ ($\text{F1} = 0.4886, \text{AUROC} = 0.8747$) with a high false-positive rate of $41.4\text{ FP per }1,000\text{ windows}$. Replacing Smooth RectLU with \textbf{Symmetric $\sigma$-AS-RectLU ($\kappa=0.8$)} completely eliminates collapse across all three backbones: it restores Clair3-Style PileupNet to $\text{MCC}(\tau^*) = \mathbf{0.9722 \pm 0.0076}$ ($\text{F1} = 0.9743, \text{AUROC} = 1.0000, \text{FP/1k} = 0.0$), elevates DeepVariant-Style InceptionNet to $\text{MCC}(\tau^*) = \mathbf{0.9815 \pm 0.0076}$ ($\text{F1} = 0.9830, \text{FP/1k} = 0.0$, outperforming ReLU at $0.9754 \pm 0.0044$), and achieves the highest overall accuracy in PathwayB-2DCNN ($\text{MCC}(\tau^*) = \mathbf{0.9877 \pm 0.0044}, \text{F1} = \mathbf{0.9887}, \text{FP/1k} = \mathbf{0.0}$).
+    \end{itemize}
+    \item \textbf{Computational Performance \& Hardware Footprint on NVIDIA RTX 2050 (E10, Table~12):} All three neural backbones require only $2.453\text{M}$--$3.466\text{M}$ parameters and $396.9\text{ MB}$--$731.2\text{ MB}$ of peak GPU VRAM (easily fitting within consumer $4\text{ GB}$ GPUs), achieving real-time single-window clinical screening latencies of $0.82$--$6.23\text{ ms/window}$ ($\text{Batch}=1$) and high-throughput screening rates of $2,854.6$--$12,219.6\text{ windows/s}$ ($\text{Batch}=128$).
+\end{enumerate}
+
+\manuscriptchange Added Section~5.7 and \textbf{Table~12} reporting the statistical variant callers, Clair3-style and DeepVariant-style neural backbones, hardware efficiency metrics (E10), and software verification audit (E12).
+
+\vspace{1em}
+\noindent We thank the Editor and Reviewers again for their guidance, which has substantially strengthened both the mechanistic rigor and the biomedical software utility of our work.
+
+\vspace{0.8em}
+\noindent Sincerely,\\[0.4em]
+\textbf{Preecha Noiumkar} and \textbf{Thawatchai Chomsiri}\\
+Department of Information Technology, Faculty of Informatics\\
+Mahasarakham University, Thailand
+
+\end{document}

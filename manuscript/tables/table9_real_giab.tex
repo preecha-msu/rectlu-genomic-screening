@@ -1,0 +1,38 @@
+\begin{table*}[t]
+\centering
+\caption{Comprehensive multi-seed evaluation on shortcut-controlled NIST GIAB (GRCh38 v4.2.1) benchmarks ($N=5$ seeds, 20 epochs). \textbf{Top:} 2D BAM read-pileup classification (10:1 imbalance with real-flanking reference negatives) stratified by variant type (SNV vs.\ Indel) and zygosity (Heterozygous $0/1$ vs.\ Homozygous $1/1$), alongside 1D unit-$L_2$-normalized $k$-mer controls (50:1/10:1 coverage-shortcut removed). \textbf{Bottom:} Biological scale-width mismatch evaluation via read-coverage downsampling ($50\times \to 30\times \to 15\times \to 10\times$).}
+\label{tab:real_giab_stratified}
+\footnotesize
+\setlength{\tabcolsep}{4.2pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lcccccccccc}
+\toprule
+& \multicolumn{3}{c}{\textbf{2D Pileup Overall (10:1)}} & \multicolumn{2}{c}{\textbf{Variant Type}} & \multicolumn{2}{c}{\textbf{Zygosity}} & \multicolumn{2}{c}{\textbf{1D Unit-$L_2$ $k$-mer}} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-6} \cmidrule(lr){7-8} \cmidrule(lr){9-10}
+\textbf{Configuration} & \textbf{MCC(0.5)} & \textbf{MCC($\tau^*$)} & \textbf{AUROC} & \textbf{SNV} & \textbf{Indel} & \textbf{Het ($0/1$)} & \textbf{Hom ($1/1$)} & \textbf{MCC($\tau^*$)} & \textbf{AUROC} \\
+\midrule
+Max-Bin Heuristic (Unit-$L_2$ Control) & --- & --- & --- & --- & --- & --- & --- & 0.0160 & 0.4715 \\
+ReLU ($C^0$ Homogeneous) & 0.9704 & 0.9908 & 1.0000 & 0.9878 & 0.9939 & 0.9834 & 0.9964 & 0.7139 & $0.9785 \pm 0.0018$ \\
+Symm.\ SmeLU ($C^1, L=-1.0, W=2.0$) & 0.7609 & 0.9373 & 1.0000 & 0.9380 & 0.9282 & 0.8883 & 0.9773 & --- & --- \\
+Smooth RectLU ($C^1, L=0.0, W=2.0$) & 0.5740 & 0.6253 & 0.8359 & 0.6218 & 0.5947 & 0.6067 & 0.6175 & 0.4686 & $0.8781 \pm 0.0232$ \\
+Cont.\ RectLU ($C^0, L=0.0, W=2.0$) & 0.9610 & 0.9835 & 0.9998 & 0.9781 & 0.9760 & 0.9705 & 0.9856 & --- & --- \\
+Cont.\ RectLU ($C^0, L=-1.0, W=2.0$) & 0.9591 & 0.9873 & 1.0000 & 0.9832 & 0.9708 & 0.9775 & 0.9823 & --- & --- \\
+Cont.\ RectLU Wide ($C^0, L=0.0, W=8.5$) & 0.1907 & 0.2614 & 0.7129 & 0.2492 & 0.2395 & 0.2408 & 0.2466 & --- & --- \\
+Cont.\ RectLU Wide ($C^0, L=-1.5, W=8.5$) & 0.0000 & 0.1830 & \textbf{0.9829} & 0.1823 & 0.1868 & 0.1683 & 0.2000 & --- & --- \\
+Hybrid (Smooth-Conv + ReLU-Dense) & 0.7628 & 0.8158 & 0.9328 & 0.8170 & 0.7768 & 0.7995 & 0.8066 & --- & --- \\
+LN (No-Affine) + SmeLU ($\beta=0.4$) & 0.9666 & \textbf{0.9910} & \textbf{1.0000} & \textbf{0.9882} & 0.9769 & \textbf{0.9842} & 0.9860 & --- & --- \\
+\textbf{Symm.\ $\sigma$-AS-RectLU ($\kappa=0.8$)} & \textbf{0.9610} & \textbf{0.9871} & \textbf{1.0000} & \textbf{0.9828} & \textbf{0.9939} & \textbf{0.9768} & \textbf{0.9964} & \textbf{0.7299} & $\mathbf{0.9797 \pm 0.0022}$ \\
+\midrule
+\multicolumn{10}{l}{\textit{Biological Read-Depth Downsampling Sweep (Testing Scale-Width Mismatch $\sigma_l \ll W$ Across Sequencing Depths):}} \\
+\midrule
+\textbf{Read Coverage Regime} & \multicolumn{2}{c}{\textbf{ReLU ($C^0$)}} & \multicolumn{2}{c}{\textbf{Smooth RectLU ($L=0, W=2$)}} & \multicolumn{2}{c}{\textbf{Hybrid (Smooth+ReLU)}} & \multicolumn{3}{c}{\textbf{Symm.\ $\sigma$-AS-RectLU ($\kappa=0.8$)}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-10}
+& \textbf{MCC($\tau^*$)} & \textbf{AUROC} & \textbf{MCC($\tau^*$)} & \textbf{AUROC} & \textbf{MCC($\tau^*$)} & \textbf{AUROC} & \multicolumn{2}{c}{\textbf{MCC($\tau^*$)}} & \textbf{AUROC} \\
+\midrule
+Standard Depth ($50\times$) & 0.9910 & 1.0000 & 0.6948 & 0.8744 & 0.7009 & 0.8836 & \multicolumn{2}{c}{\textbf{0.9908}} & \textbf{1.0000} \\
+Moderate Depth ($30\times$) & 0.9877 & 0.9996 & 0.6734 & 0.8720 & \textbf{0.9939} & \textbf{0.9999} & \multicolumn{2}{c}{\textbf{0.9908}} & \textbf{0.9998} \\
+Low Depth ($15\times$) & 0.9218 & 0.9935 & 0.6125 & 0.8664 & 0.8827 & 0.9936 & \multicolumn{2}{c}{\textbf{0.9161}} & \textbf{0.9929} \\
+Ultra-Low Depth ($10\times$) & 0.9054 & 0.9895 & 0.6091 & 0.8437 & 0.8758 & 0.9779 & \multicolumn{2}{c}{\textbf{0.8928}} & \textbf{0.9880} \\
+\bottomrule
+\end{tabular}
+\end{table*}

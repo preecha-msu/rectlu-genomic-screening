@@ -1,0 +1,36 @@
+{
+  "project": "RectLU-Genomic-Collapse-Unified",
+  "seeds_10": [
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51
+  ],
+  "seeds_5": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "monte_carlo_seed": 42,
+  "monte_carlo_samples": 4000000,
+  "training": {
+    "batch_size": 128,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "epochs_standard": 20,
+    "epochs_extended": [
+      50,
+      100
+    ],
+    "adam_eps_default": 1e-08,
+    "adam_eps_diagnostic": 1e-12
+  }
+}

@@ -1,0 +1,49 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, urlcolor=blue!70!black}
+\setlength{\parskip}{0.55em}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+\textbf{Date:} November 1, 2026
+
+\vspace{0.5em}
+\textbf{To:} The Editor-in-Chief\\
+\textit{Computer Methods and Programs in Biomedicine Update}
+
+\vspace{0.5em}
+\textbf{Subject:} Submission of Original Research Manuscript
+
+\vspace{0.5em}
+Dear Editor-in-Chief,
+
+We are pleased to submit our original research manuscript entitled \textbf{``Scale-Adaptive Piecewise-Quadratic Rectifiers for Rare-Event Genomic and Multi-Domain Screening: Offset-Scale Equivalence, Mechanistic Diagnostics, and Reproducible Computational Validation''} by Preecha Noiumkar and Thawatchai Chomsiri for consideration for publication in \textit{Computer Methods and Programs in Biomedicine Update}.
+
+Convolutional neural networks (CNNs) are widely deployed in biomedical informatics for rare-event candidate screening, such as germline variant filtering in high-throughput sequencing read pileups. Under severe class imbalance ($10:1$ to $200:1$), classifiers are highly susceptible to silent majority-class collapse---achieving $>99\%$ overall accuracy while failing to detect any minority positive events ($\text{MCC} = 0.0000$). While piecewise-quadratic $C^1$-continuous rectifiers such as Smooth ReLU (SmeLU) and Smooth RectLU offer hardware-efficient alternatives to transcendental activations, asymmetric formulations anchored at $L = 0, W = 2$ suffer from severe optimization stagnation in multi-layer 2D architectures.
+
+In this study, we provide a unified theoretical, diagnostic, and software framework that directly advances computational methods in biomedicine:
+\begin{enumerate}
+    \item \textbf{Exact Mechanistic Dissection \& Offset-Scale Equivalence:} We prove that $C^1$ smoothness itself does not cause collapse; rather, Smooth RectLU satisfies the exact algebraic identity $f_S(x; L, W) = \text{SmeLU}_{W/2}(x - L - W/2)$. Initializing at $L = 0, W = 2$ imposes an implicit negative bias offset ($\Delta b = -1$), a zero origin slope, and severe second-moment contraction ($\text{gain} = 0.0874$). Through $2\times 2$ factorial experiments, all-layer bias compensation ablations (Groups A--F), and backward Jacobian derivations, we disentangle initialization confounds from scale-width mismatch.
+    \item \textbf{Parameter-Free Scale Adaptation ($\text{Symmetric } \sigma\text{-AS-RectLU}$):} We introduce Symmetric Per-Sample $\sigma$-AS-RectLU, which dynamically locks transition width to each sample's root-mean-square scale via stop-gradient locking ($W_l = \kappa \operatorname{stopgrad}(\hat{\sigma}_{\text{RMS}}), L_l = -W_l / 2$). This formulation restores degree-1 positive homogeneity, requires zero trainable affine parameters, and reduces GPU training time by $33\%$ compared to differentiable RMS scaling or explicit LayerNorm.
+    \item \textbf{Rigorous Biomedical \& Variant-Calling Backbone Validation:} Using shortcut-controlled NIST Genome in a Bottle (GIAB GRCh38 v4.2.1, HG001--HG007) benchmarks, we evaluate 1D unit-$L_2$-normalized $k$-mer spectra and 2D BAM read-pileup tensors stratified across variant types (SNV vs.\ Small Indel), zygosity (Heterozygous $0/1$ vs.\ Homozygous $1/1$), and biological read-depth downsampling ($50\times \to 10\times$). Furthermore, on a 2D Hard-Negative Genomic Stress Benchmark containing strand-biased sequencing errors, chimeric reads, and homopolymer slippage, we benchmark our method against five handcrafted/classical ML baselines, two statistical pileup callers (GATK-style Diploid LLR and FreeBayes-style Strand-Aware callers), and clinical neural variant-caller backbones (\textbf{Clair3-Style PileupNet} and \textbf{DeepVariant-Style Multi-Scale InceptionNet}). Our results demonstrate that while uncompensated Smooth RectLU collapses in Clair3-style ($\text{MCC} = 0.0000$) and DeepVariant-style backbones ($\text{MCC} = 0.4478, 41.4\text{ FP/1k}$), Symmetric $\sigma$-AS-RectLU restores near-ceiling screening accuracy ($\text{MCC} = 0.9722$--$0.9877, \text{ECE} = 0.0036, 0.0\text{ FP/1k}$).
+    \item \textbf{Reproducible Open-Source Software Package:} In alignment with the software and reproducibility scope of \textit{CMPB Update}, all datasets (\texttt{.npz}), per-seed evaluation logs (\texttt{.csv}), hardware profiling scripts, automated unit tests verifying mathematical identities, and a PEP~621 installable Python package (\texttt{pyproject.toml}) are publicly archived at \url{https://github.com/preecha-msu/rectlu-genomic-screening} (Release tag \texttt{v4.0.0}).
+\end{enumerate}
+
+This manuscript is original, has not been published previously, and is not under consideration for publication elsewhere. All authors have approved the manuscript and declare no competing interests. This research project was financially supported by the Faculty of Informatics, Mahasarakham University.
+
+Thank you very much for your time and consideration.
+
+\vspace{0.8em}
+Sincerely,\\[0.5em]
+\textbf{Preecha Noiumkar} (Corresponding Author) and \textbf{Thawatchai Chomsiri}\\
+Research Center of Information Technology for the Future\\
+Department of Information Technology, Faculty of Informatics\\
+Mahasarakham University, Mahasarakham 44150, Thailand\\
+Emails: \texttt{preecha.n@msu.ac.th}, \texttt{thawatchai.c@msu.ac.th}
+
+\end{document}
