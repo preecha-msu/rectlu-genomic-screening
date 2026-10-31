@@ -11,3 +11,8 @@ data/raw_giab/*.bam
 data/raw_giab/*.bai
 data/processed_giab/2d_bam_pileups/giab_2d_stratified_depth_sweep.npz
 data/raw_giab/HG006_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
+
+manuscript/Reviewer_Critique*.docx
+manuscript/RectLU_Genomic_Collapse_COMPOUND.pdf
+untitled.py
+src/untitled.py
